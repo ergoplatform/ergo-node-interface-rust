@@ -3,6 +3,10 @@ name = "ergo-node-interface"
 version = "0.1.0"
 authors = ["Robert Kornacki <11645932+robkorn@users.noreply.github.com>"]
 edition = "2018"
+license = "MIT"
+description = "A library which makes interacting with and using an Ergo Node simple."
+repository = "https://github.com/Emurgo/ergo-node-interface"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

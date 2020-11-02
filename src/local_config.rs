@@ -1,5 +1,5 @@
-/// This file holds functions related to saving/accessing local data
-/// related to interacting with an ergo node. (Ip/Port/Api Key)
+/// Functions related to saving/accessing local data
+/// for interacting with an Ergo Node. (Ip/Port/Api Key)
 use crate::node_interface::{NodeError, NodeInterface, Result};
 use std::fs::File;
 use std::io::prelude::*;

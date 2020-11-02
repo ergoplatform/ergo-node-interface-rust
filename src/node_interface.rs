@@ -1,10 +1,9 @@
 /// The `NodeInterface` struct is defined which allows for interacting with an
 /// Ergo Node via Rust.
+use crate::JsonString;
 use ergo_lib::chain::ergo_box::ErgoBox;
-use ergo_offchain_utilities::{BlockHeight, P2PKAddressString, P2SAddressString, ScanID, TxId};
+use ergo_offchain_utilities::{BlockHeight, NanoErg, P2PKAddressString, P2SAddressString, TxId};
 use json::JsonValue;
-use reqwest::blocking::{RequestBuilder, Response};
-use reqwest::header::{HeaderValue, CONTENT_TYPE};
 use serde_json::from_str;
 use thiserror::Error;
 
@@ -20,6 +19,8 @@ pub enum NodeError {
     FailedParsingBox(String),
     #[error("No Boxes Were Found.")]
     NoBoxesFound,
+    #[error("An insufficient number of Ergs were found.")]
+    InsufficientErgsBalance(),
     #[error("Failed registering UTXO-set scan with the node: {0}")]
     FailedRegisteringScan(String),
     #[error("The node rejected the request you provided.\nNode Response: {0}")]
@@ -28,6 +29,8 @@ pub enum NodeError {
     NoAddressesInWallet,
     #[error("The node is still syncing.")]
     NodeSyncing,
+    #[error("Error while processing Node Interface Config Yaml: {0}")]
+    YamlError(String),
     #[error("{0}")]
     Other(String),
 }
@@ -52,50 +55,71 @@ impl NodeInterface {
     }
 
     /// Returns `http://ip:port` using `ip` and `port` from self
-    pub fn get_node_url(&self) -> String {
+    pub fn node_url(&self) -> String {
         "http://".to_string() + &self.ip + ":" + &self.port
     }
 
-    /// Registers a scan with the node and either returns the `scan_id` or an error
-    pub fn register_scan(&self, scan_json: &JsonValue) -> Result<ScanID> {
-        let endpoint = "/scan/register";
-        let body = scan_json.clone().to_string();
-        let res = self.send_post_req(endpoint, body);
-        let res_json = self.parse_response_to_json(res)?;
+    /// Submits a Signed Transaction provided as input as JSON
+    /// to the Ergo Blockchain mempool.
+    pub fn submit_transaction(&self, signed_tx_json: &JsonString) -> Result<TxId> {
+        let endpoint = "/transactions";
+        let res_json = self.use_json_endpoint_and_check_errors(endpoint, signed_tx_json)?;
 
-        if res_json["error"].is_null() {
-            return Ok(res_json["scanId"].to_string().clone());
-        } else {
-            return Err(NodeError::BadRequest(res_json["error"].to_string()));
-        }
+        // If tx is valid and is posted, return just the tx id
+        let tx_id = res_json.dump();
+        return Ok(tx_id);
     }
 
-    /// Using the `scan_id` of a registered scan, acquires unspent boxes which have been found by said scan
-    pub fn get_scan_boxes(&self, scan_id: &ScanID) -> Result<Vec<ErgoBox>> {
-        let endpoint = "/scan/unspentBoxes/".to_string() + scan_id;
-        let res = self.send_get_req(&endpoint);
-        let res_json = self.parse_response_to_json(res)?;
+    /// Generates Json of an Unsigned Transaction.
+    /// Input must be a json formatted request with rawInputs (and rawDataInputs)
+    /// manually selected or will be automatically selected by wallet.
+    pub fn generate_transaction(&self, tx_request_json: &JsonString) -> Result<JsonValue> {
+        let endpoint = "/wallet/transaction/generate";
+        let res_json = self.use_json_endpoint_and_check_errors(endpoint, tx_request_json)?;
 
-        let mut box_list = vec![];
-        for i in 0.. {
-            let box_json = &res_json[i]["box"];
-            if box_json.is_null() {
-                break;
-            } else {
-                let res_ergo_box = from_str(&box_json.to_string());
-                if let Ok(ergo_box) = res_ergo_box {
-                    box_list.push(ergo_box);
-                } else if let Err(e) = res_ergo_box {
-                    let mess = format!("Box Json: {}\nError: {:?}", box_json.to_string(), e);
-                    return Err(NodeError::FailedParsingBox(mess));
-                }
-            }
-        }
-        Ok(box_list)
+        Ok(res_json)
+    }
+
+    /// Sign an Unsigned Transaction which is formatted in JSON
+    pub fn sign_transaction(&self, unsigned_tx_string: &JsonString) -> Result<JsonValue> {
+        let endpoint = "/wallet/transaction/sign";
+        let unsigned_tx_json = json::parse(&unsigned_tx_string)
+            .map_err(|_| NodeError::FailedParsingNodeResponse(unsigned_tx_string.to_string()))?;
+
+        let prepared_body = object! {
+            tx: unsigned_tx_json
+        };
+
+        println!("Unsigned tx Json: {:?}", prepared_body.dump());
+
+        let res_json = self.use_json_endpoint_and_check_errors(endpoint, &prepared_body.dump())?;
+
+        Ok(res_json)
+    }
+
+    /// Sign an Unsigned Transaction which is formatted in JSON
+    /// and then submit it to the mempool.
+    pub fn sign_and_submit_transaction(&self, unsigned_tx_string: &JsonString) -> Result<TxId> {
+        let signed_tx = self.sign_transaction(unsigned_tx_string)?;
+        let signed_tx_json = json::stringify(signed_tx);
+
+        self.submit_transaction(&signed_tx_json)
+    }
+
+    /// Generates and submits a tx using the node endpoints. Input is
+    /// a json formatted request with rawInputs (and rawDataInputs)
+    /// manually selected or inputs will be automatically selected by wallet.
+    /// Returns the resulting `TxId`.
+    pub fn generate_and_submit_transaction(&self, tx_request_json: &JsonString) -> Result<TxId> {
+        let endpoint = "/wallet/transaction/send";
+        let res_json = self.use_json_endpoint_and_check_errors(endpoint, tx_request_json)?;
+        // If tx is valid and is posted, return just the tx id
+        let tx_id = res_json.dump();
+        return Ok(tx_id);
     }
 
     /// Get all addresses from the node wallet
-    pub fn get_wallet_addresses(&self) -> Result<Vec<P2PKAddressString>> {
+    pub fn wallet_addresses(&self) -> Result<Vec<P2PKAddressString>> {
         let endpoint = "/wallet/addresses";
         let res = self.send_get_req(endpoint)?;
 
@@ -118,7 +142,7 @@ impl NodeInterface {
 
     /// A CLI interactive interface for prompting a user to select an address
     pub fn select_wallet_address(&self) -> Result<P2PKAddressString> {
-        let address_list = self.get_wallet_addresses()?;
+        let address_list = self.wallet_addresses()?;
         if address_list.len() == 1 {
             return Ok(address_list[0].clone());
         }
@@ -143,7 +167,7 @@ impl NodeInterface {
     }
 
     /// Acquires unspent boxes from the node wallet
-    pub fn get_unspent_wallet_boxes(&self) -> Result<Vec<ErgoBox>> {
+    pub fn unspent_boxes(&self) -> Result<Vec<ErgoBox>> {
         let endpoint = "/wallet/boxes/unspent?minConfirmations=0&minInclusionHeight=0";
         let res = self.send_get_req(endpoint);
         let res_json = self.parse_response_to_json(res)?;
@@ -163,22 +187,71 @@ impl NodeInterface {
         Ok(box_list)
     }
 
+    /// Returns unspent boxes from the node wallet ordered from highest to
+    /// lowest nanoErgs value.
+    pub fn unspent_boxes_sorted(&self) -> Result<Vec<ErgoBox>> {
+        let mut boxes = self.unspent_boxes()?;
+        boxes.sort_by(|a, b| b.value.as_u64().partial_cmp(&a.value.as_u64()).unwrap());
+
+        Ok(boxes)
+    }
+
+    /// Returns a sorted list of unspent boxes which cover at least the
+    /// provided value `total` of nanoErgs.
+    /// Note: This box selection strategy simply uses the largest
+    /// value holding boxes from the user's wallet first.
+    pub fn unspent_boxes_with_min_total(&self, total: NanoErg) -> Result<Vec<ErgoBox>> {
+        self.consume_boxes_until_total(total, &self.unspent_boxes_sorted()?)
+    }
+
+    /// Returns a list of unspent boxes which cover at least the
+    /// provided value `total` of nanoErgs.
+    /// Note: This box selection strategy simply uses the oldest unspent
+    /// boxes from the user's full node wallet first.
+    pub fn unspent_boxes_with_min_total_by_age(&self, total: NanoErg) -> Result<Vec<ErgoBox>> {
+        self.consume_boxes_until_total(total, &self.unspent_boxes()?)
+    }
+
+    /// Given a `Vec<ErgoBox>`, consume each ErgoBox into a new list until
+    /// the `total` is reached. If there are an insufficient number of
+    /// nanoErgs in the provided `boxes` then it returns an error.
+    fn consume_boxes_until_total(
+        &self,
+        total: NanoErg,
+        boxes: &Vec<ErgoBox>,
+    ) -> Result<Vec<ErgoBox>> {
+        let mut count = 0;
+        let filtered_boxes = boxes.into_iter().fold(vec![], |mut acc, b| {
+            if count >= total {
+                acc
+            } else {
+                count += b.value.as_u64();
+                acc.push(b.clone());
+                acc
+            }
+        });
+        if count < total {
+            return Err(NodeError::InsufficientErgsBalance());
+        }
+        Ok(filtered_boxes)
+    }
+
     /// Acquires the unspent box with the highest value of Ergs inside
     /// from the wallet
-    pub fn get_highest_value_unspent_box(&self) -> Result<ErgoBox> {
-        let boxes = self.get_unspent_wallet_boxes()?;
+    pub fn highest_value_unspent_box(&self) -> Result<ErgoBox> {
+        let boxes = self.unspent_boxes()?;
 
         // Find the highest value amount held in a single box in the wallet
         let highest_value = boxes.iter().fold(0, |acc, b| {
-            if b.value.as_u64() > acc {
-                b.value.as_u64()
+            if b.value.as_u64().clone() > acc {
+                b.value.as_u64().clone()
             } else {
                 acc
             }
         });
 
         for b in boxes {
-            if b.value.as_u64() == highest_value {
+            if b.value.as_u64().clone() == highest_value {
                 return Ok(b);
             }
         }
@@ -187,38 +260,13 @@ impl NodeInterface {
 
     /// Acquires the unspent box with the highest value of Ergs inside
     /// from the wallet and serializes it
-    pub fn get_serialized_highest_value_unspent_box(&self) -> Result<String> {
-        let ergs_box_id: String = self.get_highest_value_unspent_box()?.box_id().into();
+    pub fn serialized_highest_value_unspent_box(&self) -> Result<String> {
+        let ergs_box_id: String = self.highest_value_unspent_box()?.box_id().into();
         self.serialized_box_from_id(&ergs_box_id)
     }
 
-    /// Generates (and sends) a tx using the node endpoints.
-    /// Input must be a json formatted request with rawInputs (and rawDataInputs)
-    /// manually selected or will be automatically selected by wallet.
-    /// Returns the resulting `TxId`.
-    pub fn send_transaction(&self, tx_request_json: &JsonValue) -> Result<TxId> {
-        let endpoint = "/wallet/transaction/send";
-        let body = json::stringify(tx_request_json.clone());
-        let res = self.send_post_req(endpoint, body);
-
-        let res_json = self.parse_response_to_json(res)?;
-        let error_details = res_json["detail"].to_string().clone();
-
-        // Check if send tx request failed and returned error json
-        if error_details != "null" {
-            return Err(NodeError::BadRequest(error_details));
-        }
-        // Otherwise if tx is valid and is posted, return just the tx id
-        else {
-            // Clean string to be only the tx_id value
-            let tx_id = res_json.dump();
-
-            return Ok(tx_id);
-        }
-    }
-
     /// Given a P2S Ergo address, extract the hex-encoded serialized ErgoTree (script)
-    pub fn address_to_tree(&self, address: &P2SAddressString) -> Result<String> {
+    pub fn p2s_to_tree(&self, address: &P2SAddressString) -> Result<String> {
         let endpoint = "/script/addressToTree/".to_string() + address;
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
@@ -227,7 +275,7 @@ impl NodeInterface {
     }
 
     /// Given a P2S Ergo address, convert it to a hex-encoded Sigma byte array constant
-    pub fn address_to_bytes(&self, address: &P2SAddressString) -> Result<String> {
+    pub fn p2s_to_bytes(&self, address: &P2SAddressString) -> Result<String> {
         let endpoint = "/script/addressToBytes/".to_string() + address;
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
@@ -236,7 +284,7 @@ impl NodeInterface {
     }
 
     /// Given an Ergo P2PK Address, convert it to a raw hex-encoded EC point
-    pub fn address_to_raw(&self, address: &P2PKAddressString) -> Result<String> {
+    pub fn p2pk_to_raw(&self, address: &P2PKAddressString) -> Result<String> {
         let endpoint = "/utils/addressToRaw/".to_string() + address;
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
@@ -247,13 +295,13 @@ impl NodeInterface {
     /// Given an Ergo P2PK Address, convert it to a raw hex-encoded EC point
     /// and prepend the type bytes so it is encoded and ready
     /// to be used in a register.
-    pub fn address_to_raw_for_register(&self, address: &P2PKAddressString) -> Result<String> {
-        let add = self.address_to_raw(address)?;
+    pub fn p2pk_to_raw_for_register(&self, address: &P2PKAddressString) -> Result<String> {
+        let add = self.p2pk_to_raw(address)?;
         Ok("07".to_string() + &add)
     }
 
     /// Given a raw hex-encoded EC point, convert it to a P2PK address
-    pub fn raw_to_address(&self, raw: &String) -> Result<P2PKAddressString> {
+    pub fn raw_to_p2pk(&self, raw: &String) -> Result<P2PKAddressString> {
         let endpoint = "/utils/rawToAddress/".to_string() + raw;
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
@@ -263,8 +311,8 @@ impl NodeInterface {
 
     /// Given a raw hex-encoded EC point from a register (thus with type encoded characters in front),
     /// convert it to a P2PK address
-    pub fn raw_from_register_to_address(&self, typed_raw: &String) -> Result<P2PKAddressString> {
-        Ok(self.raw_to_address(&typed_raw[2..].to_string())?)
+    pub fn raw_from_register_to_p2pk(&self, typed_raw: &String) -> Result<P2PKAddressString> {
+        Ok(self.raw_to_p2pk(&typed_raw[2..].to_string())?)
     }
 
     /// Given a `Vec<ErgoBox>` return the given boxes (which must be part of the UTXO-set) as
@@ -284,8 +332,8 @@ impl NodeInterface {
         self.serialized_box_from_id(&b.box_id().into())
     }
 
-    /// Given a box id return the given box (which must be part of the UTXO-set) as
-    /// a serialized string in Base16 encoding
+    /// Given a box id return the given box (which must be part of the
+    /// UTXO-set) as a serialized string in Base16 encoding
     pub fn serialized_box_from_id(&self, box_id: &String) -> Result<String> {
         let endpoint = "/utxo/byIdBinary/".to_string() + box_id;
         let res = self.send_get_req(&endpoint);
@@ -294,13 +342,43 @@ impl NodeInterface {
         Ok(res_json["bytes"].to_string().clone())
     }
 
-    /// Get the current block height of the chain
+    /// Given a box id return the given box (which must be part of the
+    /// UTXO-set) as a serialized string in Base16 encoding
+    pub fn box_from_id(&self, box_id: &String) -> Result<ErgoBox> {
+        let endpoint = "/utxo/byId/".to_string() + box_id;
+        let res = self.send_get_req(&endpoint);
+        let res_json = self.parse_response_to_json(res)?;
+
+        if let Some(ergo_box) = from_str(&res_json.to_string()).ok() {
+            return Ok(ergo_box);
+        } else {
+            return Err(NodeError::FailedParsingBox(res_json.pretty(2)));
+        }
+    }
+
+    /// Get the current nanoErgs balance held in the Ergo Node wallet
+    pub fn wallet_nano_ergs_balance(&self) -> Result<NanoErg> {
+        let endpoint = "/wallet/balances";
+        let res = self.send_get_req(&endpoint);
+        let res_json = self.parse_response_to_json(res)?;
+
+        let balance = res_json["balance"].clone();
+
+        if balance.is_null() {
+            return Err(NodeError::NodeSyncing);
+        } else {
+            return balance
+                .as_u64()
+                .ok_or(NodeError::FailedParsingNodeResponse(res_json.to_string()));
+        }
+    }
+
+    /// Get the current block height of the blockchain
     pub fn current_block_height(&self) -> Result<BlockHeight> {
         let endpoint = "/info";
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
-        // Switched from fullHeight to height to prevent errors when node is syncing headers. Need to ensure this still works as expected.
         let height_json = res_json["fullHeight"].clone();
 
         if height_json.is_null() {
@@ -311,50 +389,5 @@ impl NodeInterface {
                 .parse()
                 .map_err(|_| NodeError::FailedParsingNodeResponse(res_json.to_string()));
         }
-    }
-
-    /// Builds a `HeaderValue` to use for requests with the api key specified
-    fn get_node_api_header(&self) -> HeaderValue {
-        match HeaderValue::from_str(&self.api_key) {
-            Ok(k) => k,
-            _ => HeaderValue::from_static("None"),
-        }
-    }
-
-    /// Sets required headers for a request
-    fn set_req_headers(&self, rb: RequestBuilder) -> RequestBuilder {
-        rb.header("accept", "application/json")
-            .header("api_key", self.get_node_api_header())
-            .header(CONTENT_TYPE, "application/json")
-    }
-
-    /// Sends a GET request to the Ergo node
-    fn send_get_req(&self, endpoint: &str) -> Result<Response> {
-        let url = self.get_node_url().to_owned() + endpoint;
-        let client = reqwest::blocking::Client::new().get(&url);
-        self.set_req_headers(client)
-            .send()
-            .map_err(|_| NodeError::NodeUnreachable)
-    }
-
-    /// Sends a POST request to the Ergo node
-    fn send_post_req(&self, endpoint: &str, body: String) -> Result<Response> {
-        let url = self.get_node_url().to_owned() + endpoint;
-        let client = reqwest::blocking::Client::new().post(&url);
-        self.set_req_headers(client)
-            .body(body)
-            .send()
-            .map_err(|_| NodeError::NodeUnreachable)
-    }
-
-    /// Parses response from node into JSON
-    fn parse_response_to_json(&self, resp: Result<Response>) -> Result<JsonValue> {
-        let text = resp?.text().map_err(|_| {
-            NodeError::FailedParsingNodeResponse(
-                "Node Response Not Parseable into Text.".to_string(),
-            )
-        })?;
-        let json = json::parse(&text).map_err(|_| NodeError::FailedParsingNodeResponse(text))?;
-        Ok(json)
     }
 }

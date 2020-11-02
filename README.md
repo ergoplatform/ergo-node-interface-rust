@@ -90,8 +90,11 @@ pub fn new_interface_from_local_config() -> Result<NodeInterface> {
 Documentation
 ============
 
-...
+Documentation can be accessed via running the following command:
 
+```rust
+cargo doc --open
+```
 
 
 Contributing

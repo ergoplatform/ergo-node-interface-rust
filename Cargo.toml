@@ -7,6 +7,8 @@ license = "MIT"
 description = "A library which makes interacting with and using an Ergo Node simple."
 repository = "https://github.com/Emurgo/ergo-node-interface"
 readme = "README.md"
+keywords = ["ergo", "blockchain", "node-interface", "dApp"]
+categories = ["cryptography::cryptocurrencies"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

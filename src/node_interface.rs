@@ -221,15 +221,15 @@ impl NodeInterface {
         boxes: &Vec<ErgoBox>,
     ) -> Result<Vec<ErgoBox>> {
         let mut count = 0;
-        let filtered_boxes = boxes.into_iter().fold(vec![], |mut acc, b| {
+        let mut filtered_boxes = vec![];
+        for b in boxes {
             if count >= total {
-                acc
+                break;
             } else {
                 count += b.value.as_u64();
-                acc.push(b.clone());
-                acc
+                filtered_boxes.push(b.clone());
             }
-        });
+        }
         if count < total {
             return Err(NodeError::InsufficientErgsBalance());
         }

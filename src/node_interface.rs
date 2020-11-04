@@ -265,6 +265,17 @@ impl NodeInterface {
         self.serialized_box_from_id(&ergs_box_id)
     }
 
+    /// Acquires unspent boxes which cover `total` amount of nanoErgs
+    /// from the wallet and serializes the boxes
+    pub fn serialized_unspent_boxes_with_min_total(&self, total: NanoErg) -> Result<Vec<String>> {
+        let boxes = self.unspent_boxes_with_min_total(total)?;
+        let mut serialized_boxes = vec![];
+        for b in boxes {
+            serialized_boxes.push(self.serialized_box_from_id(&b.box_id().into())?);
+        }
+        Ok(serialized_boxes)
+    }
+
     /// Given a P2S Ergo address, extract the hex-encoded serialized ErgoTree (script)
     pub fn p2s_to_tree(&self, address: &P2SAddressString) -> Result<String> {
         let endpoint = "/script/addressToTree/".to_string() + address;

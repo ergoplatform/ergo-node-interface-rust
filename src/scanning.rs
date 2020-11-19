@@ -118,6 +118,14 @@ impl Scan {
 
 /// Scanning-related endpoints
 impl NodeInterface {
+    // Initiates a rescan of the blockchain history, thereby finding boxes
+    // which may have been missed by a scan been added the block height
+    // that a box was created.
+    // Note: Rescanning can take a long time.
+    // pub fn rescan_blockchain_history(&self) -> Result<String> {
+    //     todo!();
+    // }
+
     /// Registers a scan with the node and either returns the `scan_id`
     /// or an error
     pub fn register_scan(&self, scan_json: &JsonValue) -> Result<ScanID> {

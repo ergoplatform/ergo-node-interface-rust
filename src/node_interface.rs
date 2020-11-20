@@ -4,6 +4,7 @@ use crate::JsonString;
 use crate::{BlockHeight, NanoErg, P2PKAddressString, P2SAddressString, TxId};
 use ergo_lib::chain::ergo_box::ErgoBox;
 use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
+use ergo_lib::chain::transaction::Transaction;
 use json::JsonValue;
 use serde_json::from_str;
 use thiserror::Error;
@@ -120,6 +121,21 @@ impl NodeInterface {
         // If tx is valid and is posted, return just the tx id
         let tx_id = res_json.dump();
         return Ok(tx_id);
+    }
+
+    /// Submits a Signed `Transaction` provided as input
+    /// to the Ergo Blockchain mempool.
+    pub fn submit_transaction(&self, signed_tx: &Transaction) -> Result<TxId> {
+        let signed_tx_json = &serde_json::to_string(&signed_tx)
+            .map_err(|_| NodeError::Other("Failed Converting `Transaction` to json".to_string()))?;
+        self.submit_json_transaction(signed_tx_json)
+    }
+
+    /// Sign an `UnsignedTransaction`
+    pub fn sign_transaction(&self, unsigned_tx: &UnsignedTransaction) -> Result<JsonValue> {
+        self.sign_json_transaction(&serde_json::to_string(&unsigned_tx).map_err(|_| {
+            NodeError::Other("Failed Converting `UnsignedTransaction` to json".to_string())
+        })?)
     }
 
     /// Get all addresses from the node wallet

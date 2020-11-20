@@ -21,7 +21,7 @@ node_api_key: "hello"
 /// the running application
 /// This is useful for CLI applications, however should not be used by
 /// GUI-based applications.
-fn acquire_node_interface_from_local_config() -> NodeInterface {
+pub fn acquire_node_interface_from_local_config() -> NodeInterface {
     // `Node-interface.yaml` setup logic
     if !does_local_config_exist() {
         println!("Could not find local `node-interface.yaml` file.\nCreating said file with basic defaults.\nPlease edit the yaml file and update it with your node parameters to ensure the CLI app can proceed.");

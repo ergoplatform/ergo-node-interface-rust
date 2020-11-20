@@ -4,6 +4,7 @@ pub mod local_config;
 pub mod node_interface;
 mod requests;
 pub mod scanning;
+pub mod transactions;
 
 pub use node_interface::NodeInterface;
 pub use scanning::Scan;

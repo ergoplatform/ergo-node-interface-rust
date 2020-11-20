@@ -72,16 +72,6 @@ impl NodeInterface {
         return Ok(tx_id);
     }
 
-    /// Generates Json of an Unsigned Transaction.
-    /// Input must be a json formatted request with rawInputs (and rawDataInputs)
-    /// manually selected or will be automatically selected by wallet.
-    pub fn generate_json_transaction(&self, tx_request_json: &JsonString) -> Result<JsonValue> {
-        let endpoint = "/wallet/transaction/generate";
-        let res_json = self.use_json_endpoint_and_check_errors(endpoint, tx_request_json)?;
-
-        Ok(res_json)
-    }
-
     /// Sign an Unsigned Transaction which is formatted in JSON
     pub fn sign_json_transaction(&self, unsigned_tx_string: &JsonString) -> Result<JsonValue> {
         let endpoint = "/wallet/transaction/sign";
@@ -111,18 +101,6 @@ impl NodeInterface {
         self.submit_json_transaction(&signed_tx_json)
     }
 
-    /// Generates and submits a tx using the node endpoints. Input is
-    /// a json formatted request with rawInputs (and rawDataInputs)
-    /// manually selected or inputs will be automatically selected by wallet.
-    /// Returns the resulting `TxId`.
-    pub fn generate_and_submit_transaction(&self, tx_request_json: &JsonString) -> Result<TxId> {
-        let endpoint = "/wallet/transaction/send";
-        let res_json = self.use_json_endpoint_and_check_errors(endpoint, tx_request_json)?;
-        // If tx is valid and is posted, return just the tx id
-        let tx_id = res_json.dump();
-        return Ok(tx_id);
-    }
-
     /// Submits a Signed `Transaction` provided as input
     /// to the Ergo Blockchain mempool.
     pub fn submit_transaction(&self, signed_tx: &Transaction) -> Result<TxId> {
@@ -140,6 +118,34 @@ impl NodeInterface {
 
         serde_json::from_str(&json_tx.dump())
             .map_err(|_| NodeError::Other("Failed Converting `Transaction` to json".to_string()))
+    }
+
+    /// Sign an `UnsignedTransaction` and then submit it to the mempool.
+    pub fn sign_and_submit_transaction(&self, unsigned_tx: &UnsignedTransaction) -> Result<TxId> {
+        let signed_tx = self.sign_transaction(unsigned_tx)?;
+        self.submit_transaction(&signed_tx)
+    }
+
+    /// Generates and submits a tx using the node endpoints. Input is
+    /// a json formatted request with rawInputs (and rawDataInputs)
+    /// manually selected or inputs will be automatically selected by wallet.
+    /// Returns the resulting `TxId`.
+    pub fn generate_and_submit_transaction(&self, tx_request_json: &JsonString) -> Result<TxId> {
+        let endpoint = "/wallet/transaction/send";
+        let res_json = self.use_json_endpoint_and_check_errors(endpoint, tx_request_json)?;
+        // If tx is valid and is posted, return just the tx id
+        let tx_id = res_json.dump();
+        return Ok(tx_id);
+    }
+
+    /// Generates Json of an Unsigned Transaction.
+    /// Input must be a json formatted request with rawInputs (and rawDataInputs)
+    /// manually selected or will be automatically selected by wallet.
+    pub fn generate_json_transaction(&self, tx_request_json: &JsonString) -> Result<JsonValue> {
+        let endpoint = "/wallet/transaction/generate";
+        let res_json = self.use_json_endpoint_and_check_errors(endpoint, tx_request_json)?;
+
+        Ok(res_json)
     }
 
     /// Get all addresses from the node wallet

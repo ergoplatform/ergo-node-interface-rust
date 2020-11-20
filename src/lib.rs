@@ -6,6 +6,7 @@ mod requests;
 pub mod scanning;
 pub mod transactions;
 
+pub use local_config::*;
 pub use node_interface::NodeInterface;
 pub use scanning::Scan;
 

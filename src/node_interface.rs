@@ -132,10 +132,14 @@ impl NodeInterface {
     }
 
     /// Sign an `UnsignedTransaction`
-    pub fn sign_transaction(&self, unsigned_tx: &UnsignedTransaction) -> Result<JsonValue> {
-        self.sign_json_transaction(&serde_json::to_string(&unsigned_tx).map_err(|_| {
-            NodeError::Other("Failed Converting `UnsignedTransaction` to json".to_string())
-        })?)
+    pub fn sign_transaction(&self, unsigned_tx: &UnsignedTransaction) -> Result<Transaction> {
+        let json_tx =
+            self.sign_json_transaction(&serde_json::to_string(&unsigned_tx).map_err(|_| {
+                NodeError::Other("Failed Converting `UnsignedTransaction` to json".to_string())
+            })?)?;
+
+        serde_json::from_str(&json_tx.dump())
+            .map_err(|_| NodeError::Other("Failed Converting `Transaction` to json".to_string()))
     }
 
     /// Get all addresses from the node wallet

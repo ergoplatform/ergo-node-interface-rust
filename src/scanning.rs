@@ -2,7 +2,7 @@
 /// scanning in a Rust-based struct interface.
 use crate::node_interface::NodeInterface;
 pub use crate::node_interface::{NodeError, Result};
-use crate::{P2PKAddressString, P2SAddressString, ScanID};
+use crate::{P2PKAddressString, ScanID};
 use ergo_lib::chain::ergo_box::ErgoBox;
 use json;
 use json::JsonValue;

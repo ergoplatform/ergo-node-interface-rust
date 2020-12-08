@@ -27,8 +27,6 @@ impl NodeInterface {
             tx: unsigned_tx_json
         };
 
-        println!("Unsigned tx Json: {:?}", prepared_body.dump());
-
         let res_json = self.use_json_endpoint_and_check_errors(endpoint, &prepared_body.dump())?;
 
         Ok(res_json)

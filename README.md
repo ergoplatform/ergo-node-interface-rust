@@ -2,7 +2,7 @@
 
 A Rust library which makes interacting with and using an Ergo Node simple.
 
-This crate uses the great [Ergo-Lib](https://github.com/ergoplatform/sigma-rust) (formerly sigma-rust) for parsing the `ErgoBox`es from the Ergo Node and other Ergo-related data-types.
+This crate uses the great [ergo-lib](https://github.com/ergoplatform/sigma-rust) (formerly sigma-rust) for parsing the `ErgoBox`es from the Ergo Node and other Ergo-related data-types.
 
 Currently supported features include:
 1. Core Ergo Node endpoints for writing off-chain dApps.

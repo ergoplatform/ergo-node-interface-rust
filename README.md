@@ -99,4 +99,4 @@ cargo doc --open
 
 Contributing
 ============
-If you find a mistake, want to add a new endpoint, or wish to include a novel feature, please feel free to submit a PR.
+See [CONTRIBUTING](CONTRIBUTING.md)

@@ -1,4 +1,4 @@
-# Contributing to sigma-rust
+# Contributing
 
 Thanks for wanting to contribute! There are many ways to contribute and we
 appreciate any level you're willing to do.

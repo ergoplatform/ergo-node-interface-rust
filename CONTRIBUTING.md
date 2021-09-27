@@ -3,8 +3,6 @@
 Thanks for wanting to contribute! There are many ways to contribute and we
 appreciate any level you're willing to do.
 
-To get started checkout issues labeled ["help wanted" and "good first issue"](https://github.com/ergoplatform/sigma-rust/labels/help%20wanted)
-
 ## Process
 As a heads up, we'll be running your PR through the following CI jobs:
 - warnings turned to compile errors
@@ -15,7 +13,7 @@ As a heads up, we'll be running your PR through the following CI jobs:
 ## Releasing
 When we're ready to release, a project owner should do the following:
 
-- Create(checkout) a release branch (naming convention `release/vX-Y-Z` using the `ergo-lib` version);
+- Create(checkout) a release branch (naming convention `release/vX-Y-Z`);
 - install or update "cargo release" (via `cargo install cargo-release`);
 - `cargo release minor -no-dev-version -vv --dry-run` if you intend to bump a minor version 
   or change `minor` to `major` to bump a major version, `patch` to bump a patch/hotfix version 

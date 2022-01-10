@@ -1,7 +1,7 @@
 /// The `NodeInterface` struct is defined which allows for interacting with an
 /// Ergo Node via Rust.
 use crate::{BlockHeight, NanoErg, P2PKAddressString, P2SAddressString};
-use ergo_lib::chain::ergo_box::ErgoBox;
+use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
 use serde_json::from_str;
 use thiserror::Error;
 

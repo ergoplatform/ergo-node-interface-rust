@@ -3,7 +3,7 @@
 use crate::node_interface::NodeInterface;
 pub use crate::node_interface::{NodeError, Result};
 use crate::{P2PKAddressString, ScanID};
-use ergo_lib::chain::ergo_box::ErgoBox;
+use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
 use json;
 use json::JsonValue;
 use serde_json::from_str;

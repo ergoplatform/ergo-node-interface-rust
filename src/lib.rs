@@ -1,3 +1,5 @@
+#![allow(clippy::ptr_arg)]
+
 #[macro_use]
 extern crate json;
 pub mod local_config;

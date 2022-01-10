@@ -66,14 +66,14 @@ impl NodeInterface {
         for segment in res
             .text()
             .expect("Failed to get addresses from wallet.")
-            .split("\"")
+            .split('\"')
         {
             let seg = segment.trim();
-            if seg.chars().next().unwrap() == '9' {
+            if seg.starts_with('9') {
                 addresses.push(seg.to_string());
             }
         }
-        if addresses.len() == 0 {
+        if addresses.is_empty() {
             return Err(NodeError::NoAddressesInWallet);
         }
         Ok(addresses)
@@ -93,7 +93,7 @@ impl NodeInterface {
         }
         println!("Which address would you like to select?");
         let mut input = String::new();
-        if let Ok(_) = std::io::stdin().read_line(&mut input) {
+        if std::io::stdin().read_line(&mut input).is_ok() {
             if let Ok(input_n) = input.trim().parse::<usize>() {
                 if input_n > address_list.len() || input_n < 1 {
                     println!("Please select an address within the range.");
@@ -102,7 +102,7 @@ impl NodeInterface {
                 return Ok(address_list[input_n - 1].clone());
             }
         }
-        return self.select_wallet_address();
+        self.select_wallet_address()
     }
 
     /// Acquires unspent boxes from the node wallet
@@ -117,10 +117,8 @@ impl NodeInterface {
             let box_json = &res_json[i]["box"];
             if box_json.is_null() {
                 break;
-            } else {
-                if let Some(ergo_box) = from_str(&box_json.to_string()).ok() {
-                    box_list.push(ergo_box);
-                }
+            } else if let Ok(ergo_box) = from_str(&box_json.to_string()) {
+                box_list.push(ergo_box);
             }
         }
         Ok(box_list)
@@ -130,7 +128,7 @@ impl NodeInterface {
     /// lowest nanoErgs value.
     pub fn unspent_boxes_sorted(&self) -> Result<Vec<ErgoBox>> {
         let mut boxes = self.unspent_boxes()?;
-        boxes.sort_by(|a, b| b.value.as_u64().partial_cmp(&a.value.as_u64()).unwrap());
+        boxes.sort_by(|a, b| b.value.as_u64().partial_cmp(a.value.as_u64()).unwrap());
 
         Ok(boxes)
     }
@@ -154,11 +152,7 @@ impl NodeInterface {
     /// Given a `Vec<ErgoBox>`, consume each ErgoBox into a new list until
     /// the `total` is reached. If there are an insufficient number of
     /// nanoErgs in the provided `boxes` then it returns an error.
-    fn consume_boxes_until_total(
-        &self,
-        total: NanoErg,
-        boxes: &Vec<ErgoBox>,
-    ) -> Result<Vec<ErgoBox>> {
+    fn consume_boxes_until_total(&self, total: NanoErg, boxes: &[ErgoBox]) -> Result<Vec<ErgoBox>> {
         let mut count = 0;
         let mut filtered_boxes = vec![];
         for b in boxes {
@@ -182,15 +176,15 @@ impl NodeInterface {
 
         // Find the highest value amount held in a single box in the wallet
         let highest_value = boxes.iter().fold(0, |acc, b| {
-            if b.value.as_u64().clone() > acc {
-                b.value.as_u64().clone()
+            if *b.value.as_u64() > acc {
+                *b.value.as_u64()
             } else {
                 acc
             }
         });
 
         for b in boxes {
-            if b.value.as_u64().clone() == highest_value {
+            if *b.value.as_u64() == highest_value {
                 return Ok(b);
             }
         }
@@ -221,7 +215,7 @@ impl NodeInterface {
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
-        Ok(res_json["tree"].to_string().clone())
+        Ok(res_json["tree"].to_string())
     }
 
     /// Given a P2S Ergo address, convert it to a hex-encoded Sigma byte array constant
@@ -230,7 +224,7 @@ impl NodeInterface {
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
-        Ok(res_json["bytes"].to_string().clone())
+        Ok(res_json["bytes"].to_string())
     }
 
     /// Given an Ergo P2PK Address, convert it to a raw hex-encoded EC point
@@ -239,7 +233,7 @@ impl NodeInterface {
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
-        Ok(res_json["raw"].to_string().clone())
+        Ok(res_json["raw"].to_string())
     }
 
     /// Given an Ergo P2PK Address, convert it to a raw hex-encoded EC point
@@ -251,27 +245,27 @@ impl NodeInterface {
     }
 
     /// Given a raw hex-encoded EC point, convert it to a P2PK address
-    pub fn raw_to_p2pk(&self, raw: &String) -> Result<P2PKAddressString> {
+    pub fn raw_to_p2pk(&self, raw: &str) -> Result<P2PKAddressString> {
         let endpoint = "/utils/rawToAddress/".to_string() + raw;
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
-        Ok(res_json["address"].to_string().clone())
+        Ok(res_json["address"].to_string())
     }
 
     /// Given a raw hex-encoded EC point from a register (thus with type encoded characters in front),
     /// convert it to a P2PK address
-    pub fn raw_from_register_to_p2pk(&self, typed_raw: &String) -> Result<P2PKAddressString> {
-        Ok(self.raw_to_p2pk(&typed_raw[2..].to_string())?)
+    pub fn raw_from_register_to_p2pk(&self, typed_raw: &str) -> Result<P2PKAddressString> {
+        self.raw_to_p2pk(&typed_raw[2..].to_string())
     }
 
     /// Given a `Vec<ErgoBox>` return the given boxes (which must be part of the UTXO-set) as
     /// a vec of serialized strings in Base16 encoding
-    pub fn serialize_boxes(&self, b: &Vec<ErgoBox>) -> Result<Vec<String>> {
+    pub fn serialize_boxes(&self, b: &[ErgoBox]) -> Result<Vec<String>> {
         Ok(b.iter()
             .map(|b| {
                 self.serialized_box_from_id(&b.box_id().into())
-                    .unwrap_or("".to_string())
+                    .unwrap_or_else(|_| "".to_string())
             })
             .collect())
     }
@@ -289,7 +283,7 @@ impl NodeInterface {
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
-        Ok(res_json["bytes"].to_string().clone())
+        Ok(res_json["bytes"].to_string())
     }
 
     /// Given a box id return the given box (which must be part of the
@@ -299,45 +293,45 @@ impl NodeInterface {
         let res = self.send_get_req(&endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
-        if let Some(ergo_box) = from_str(&res_json.to_string()).ok() {
-            return Ok(ergo_box);
+        if let Ok(ergo_box) = from_str(&res_json.to_string()) {
+            Ok(ergo_box)
         } else {
-            return Err(NodeError::FailedParsingBox(res_json.pretty(2)));
+            Err(NodeError::FailedParsingBox(res_json.pretty(2)))
         }
     }
 
     /// Get the current nanoErgs balance held in the Ergo Node wallet
     pub fn wallet_nano_ergs_balance(&self) -> Result<NanoErg> {
         let endpoint = "/wallet/balances";
-        let res = self.send_get_req(&endpoint);
+        let res = self.send_get_req(endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
         let balance = res_json["balance"].clone();
 
         if balance.is_null() {
-            return Err(NodeError::NodeSyncing);
+            Err(NodeError::NodeSyncing)
         } else {
-            return balance
+            balance
                 .as_u64()
-                .ok_or(NodeError::FailedParsingNodeResponse(res_json.to_string()));
+                .ok_or_else(|| NodeError::FailedParsingNodeResponse(res_json.to_string()))
         }
     }
 
     /// Get the current block height of the blockchain
     pub fn current_block_height(&self) -> Result<BlockHeight> {
         let endpoint = "/info";
-        let res = self.send_get_req(&endpoint);
+        let res = self.send_get_req(endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
         let height_json = res_json["fullHeight"].clone();
 
         if height_json.is_null() {
-            return Err(NodeError::NodeSyncing);
+            Err(NodeError::NodeSyncing)
         } else {
-            return height_json
+            height_json
                 .to_string()
                 .parse()
-                .map_err(|_| NodeError::FailedParsingNodeResponse(res_json.to_string()));
+                .map_err(|_| NodeError::FailedParsingNodeResponse(res_json.to_string()))
         }
     }
 }

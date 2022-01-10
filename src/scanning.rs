@@ -37,12 +37,12 @@ impl Scan {
         node_interface: &NodeInterface,
     ) -> Result<Scan> {
         let scan_json = object! {
-        scanName: name.clone(),
-        trackingRule: tracking_rule.clone(),
+        scanName: name.to_string(),
+        trackingRule: tracking_rule,
         };
 
         let scan_id = node_interface.register_scan(&scan_json)?;
-        return Ok(Scan::new(name, &scan_id, node_interface));
+        Ok(Scan::new(name, &scan_id, node_interface))
     }
 
     /// Returns all `ErgoBox`es found by the scan
@@ -55,7 +55,7 @@ impl Scan {
     pub fn get_box(&self) -> Result<ErgoBox> {
         self.get_boxes()?
             .into_iter()
-            .nth(0)
+            .next()
             .ok_or(NodeError::NoBoxesFound)
     }
 
@@ -111,7 +111,7 @@ impl Scan {
         node: &NodeInterface,
         address: &P2PKAddressString,
     ) -> Result<String> {
-        let raw = node.p2pk_to_raw(&address)?;
+        let raw = node.p2pk_to_raw(address)?;
         Ok("0e240008cd".to_string() + &raw)
     }
 }
@@ -135,9 +135,9 @@ impl NodeInterface {
         let res_json = self.parse_response_to_json(res)?;
 
         if res_json["error"].is_null() {
-            return Ok(res_json["scanId"].to_string().clone());
+            Ok(res_json["scanId"].to_string())
         } else {
-            return Err(NodeError::BadRequest(res_json["error"].to_string()));
+            Err(NodeError::BadRequest(res_json["error"].to_string()))
         }
     }
 
@@ -185,9 +185,9 @@ impl NodeInterface {
         let res_json = self.parse_response_to_json(res)?;
 
         if res_json["error"].is_null() {
-            return Ok(res_json.to_string());
+            Ok(res_json.to_string())
         } else {
-            return Err(NodeError::BadRequest(res_json["error"].to_string()));
+            Err(NodeError::BadRequest(res_json["error"].to_string()))
         }
     }
 }

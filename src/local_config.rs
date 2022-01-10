@@ -48,7 +48,7 @@ pub fn does_local_config_exist() -> bool {
 /// Create a new `node-interface.config` with the barebones yaml inside
 pub fn create_new_local_config_file() -> Result<()> {
     let file_path = Path::new("node-interface.yaml");
-    if file_path.exists() == false {
+    if !file_path.exists() {
         let mut file = File::create(file_path).map_err(|_| {
             NodeError::YamlError("Failed to create `node-interface.yaml` file".to_string())
         })?;
@@ -66,15 +66,15 @@ pub fn create_new_local_config_file() -> Result<()> {
 
 /// Uses the config yaml provided to create a new `NodeInterface`
 pub fn new_interface_from_yaml(config: Yaml) -> Result<NodeInterface> {
-    let ip = config["node_ip"].as_str().ok_or(NodeError::YamlError(
-        "`node_ip` is not specified in the provided Yaml".to_string(),
-    ))?;
-    let port = config["node_port"].as_str().ok_or(NodeError::YamlError(
-        "`node_port` is not specified in the provided Yaml".to_string(),
-    ))?;
-    let api_key = config["node_api_key"].as_str().ok_or(NodeError::YamlError(
-        "`node_api_key` is not specified in the provided Yaml".to_string(),
-    ))?;
+    let ip = config["node_ip"].as_str().ok_or_else(|| {
+        NodeError::YamlError("`node_ip` is not specified in the provided Yaml".to_string())
+    })?;
+    let port = config["node_port"].as_str().ok_or_else(|| {
+        NodeError::YamlError("`node_port` is not specified in the provided Yaml".to_string())
+    })?;
+    let api_key = config["node_api_key"].as_str().ok_or_else(|| {
+        NodeError::YamlError("`node_api_key` is not specified in the provided Yaml".to_string())
+    })?;
     Ok(NodeInterface::new(api_key, ip, port))
 }
 

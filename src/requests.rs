@@ -22,7 +22,7 @@ impl NodeInterface {
 
     /// Sends a GET request to the Ergo node
     pub fn send_get_req(&self, endpoint: &str) -> Result<Response> {
-        let url = self.node_url().to_owned() + endpoint;
+        let url = self.node_url() + endpoint;
         let client = reqwest::blocking::Client::new().get(&url);
         self.set_req_headers(client)
             .send()
@@ -31,7 +31,7 @@ impl NodeInterface {
 
     /// Sends a POST request to the Ergo node
     pub fn send_post_req(&self, endpoint: &str, body: String) -> Result<Response> {
-        let url = self.node_url().to_owned() + endpoint;
+        let url = self.node_url() + endpoint;
         let client = reqwest::blocking::Client::new().post(&url);
         self.set_req_headers(client)
             .body(body)
@@ -57,10 +57,10 @@ impl NodeInterface {
         endpoint: &str,
         json_body: &JsonString,
     ) -> Result<JsonValue> {
-        let res = self.send_post_req(endpoint, json_body.clone());
+        let res = self.send_post_req(endpoint, json_body.to_string());
 
         let res_json = self.parse_response_to_json(res)?;
-        let error_details = res_json["detail"].to_string().clone();
+        let error_details = res_json["detail"].to_string();
 
         // Check if send tx request failed and returned error json
         if error_details != "null" {

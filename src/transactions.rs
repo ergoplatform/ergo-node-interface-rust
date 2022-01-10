@@ -14,13 +14,13 @@ impl NodeInterface {
 
         // If tx is valid and is posted, return just the tx id
         let tx_id = res_json.dump();
-        return Ok(tx_id);
+        Ok(tx_id)
     }
 
     /// Sign an Unsigned Transaction which is formatted in JSON
     pub fn sign_json_transaction(&self, unsigned_tx_string: &JsonString) -> Result<JsonValue> {
         let endpoint = "/wallet/transaction/sign";
-        let unsigned_tx_json = json::parse(&unsigned_tx_string)
+        let unsigned_tx_json = json::parse(unsigned_tx_string)
             .map_err(|_| NodeError::FailedParsingNodeResponse(unsigned_tx_string.to_string()))?;
 
         let prepared_body = object! {
@@ -78,7 +78,7 @@ impl NodeInterface {
         let res_json = self.use_json_endpoint_and_check_errors(endpoint, tx_request_json)?;
         // If tx is valid and is posted, return just the tx id
         let tx_id = res_json.dump();
-        return Ok(tx_id);
+        Ok(tx_id)
     }
 
     /// Generates Json of an Unsigned Transaction.

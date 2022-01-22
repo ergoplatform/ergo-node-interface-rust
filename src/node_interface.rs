@@ -42,6 +42,14 @@ pub struct NodeInterface {
     pub port: String,
 }
 
+pub fn is_mainnet_address(address: &str) -> bool {
+    address.starts_with('9')
+}
+
+pub fn is_testnet_address(address: &str) -> bool {
+    address.starts_with('3')
+}
+
 impl NodeInterface {
     /// Create a new `NodeInterface` using details about the Node
     pub fn new(api_key: &str, ip: &str, port: &str) -> NodeInterface {
@@ -69,7 +77,7 @@ impl NodeInterface {
             .split('\"')
         {
             let seg = segment.trim();
-            if seg.starts_with('9') {
+            if is_mainnet_address(seg) || is_testnet_address(seg) {
                 addresses.push(seg.to_string());
             }
         }

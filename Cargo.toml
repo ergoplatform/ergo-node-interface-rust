@@ -1,6 +1,6 @@
 [package]
 name = "ergo-node-interface"
-version = "0.2.6"
+version = "0.2.7"
 authors = ["Robert Kornacki <11645932+robkorn@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT"
@@ -17,7 +17,7 @@ json                = "0.12.4"
 openssl             = { version = "0.10", features = ["vendored"] }
 reqwest             = { version = "0.11.4", features = ["blocking"] }
 serde_json          = "1.0.59"
-ergo-lib            = "0.14.0"
+ergo-lib            = "0.15.0"
 thiserror           = "1.0.22"
 blake2b_simd        = "0.5.11"
 base16              = "0.2.1"

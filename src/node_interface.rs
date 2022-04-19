@@ -31,6 +31,8 @@ pub enum NodeError {
     YamlError(String),
     #[error("{0}")]
     Other(String),
+    #[error("Failed parsing wallet status from node: {0}")]
+    FailedParsingWalletStatus(String),
 }
 
 /// The `NodeInterface` struct which holds the relevant Ergo node data
@@ -342,4 +344,26 @@ impl NodeInterface {
                 .map_err(|_| NodeError::FailedParsingNodeResponse(res_json.to_string()))
         }
     }
+
+    /// Get wallet status /wallet/status
+    pub fn wallet_status(&self) -> Result<WalletStatus> {
+        let endpoint = "/wallet/status";
+        let res = self.send_get_req(endpoint);
+        let res_json = self.parse_response_to_json(res)?;
+
+        if let Ok(wallet_status) = from_str(&res_json.to_string()) {
+            Ok(wallet_status)
+        } else {
+            Err(NodeError::FailedParsingWalletStatus(res_json.pretty(2)))
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct WalletStatus {
+    pub initialized: bool,
+    pub unlocked: bool,
+    pub change_address: Option<P2PKAddressString>,
+    pub height: BlockHeight,
+    pub error: Option<String>,
 }

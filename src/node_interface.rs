@@ -361,9 +361,14 @@ impl NodeInterface {
 
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct WalletStatus {
+    #[serde(rename = "isInitialized")]
     pub initialized: bool,
+    #[serde(rename = "isUnlocked")]
     pub unlocked: bool,
+    #[serde(rename = "changeAddress")]
     pub change_address: Option<P2PKAddressString>,
+    #[serde(rename = "walletHeight")]
     pub height: BlockHeight,
+    #[serde(rename = "error")]
     pub error: Option<String>,
 }

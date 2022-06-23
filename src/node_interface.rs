@@ -372,3 +372,21 @@ pub struct WalletStatus {
     #[serde(rename = "error")]
     pub error: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_name() {
+        let node_response_json_str = r#"{
+          "isInitialized": true,
+          "isUnlocked": true,
+          "changeAddress": "3Wwc4HWrTcYkRycPNhEUSwNNBdqSBuiHy2zFvjMHukccxE77BaX3",
+          "walletHeight": 251965,
+          "error": ""
+        }"#;
+        let t: WalletStatus = serde_json::from_str(node_response_json_str).unwrap();
+        assert_eq!(t.height, 251965);
+    }
+}

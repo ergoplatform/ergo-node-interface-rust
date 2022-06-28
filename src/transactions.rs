@@ -3,7 +3,10 @@ use crate::JsonString;
 use crate::TxId;
 use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
 use ergo_lib::chain::transaction::Transaction;
+use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
+use ergo_lib::wallet::signing::TransactionContext;
 use json::JsonValue;
+use serde_json::json;
 
 impl NodeInterface {
     /// Submits a Signed Transaction provided as input as JSON
@@ -53,19 +56,39 @@ impl NodeInterface {
     }
 
     /// Sign an `UnsignedTransaction`
-    pub fn sign_transaction(&self, unsigned_tx: &UnsignedTransaction) -> Result<Transaction> {
-        let json_tx =
-            self.sign_json_transaction(&serde_json::to_string(&unsigned_tx).map_err(|_| {
-                NodeError::Other("Failed Converting `UnsignedTransaction` to json".to_string())
-            })?)?;
+    /// unsigned_tx - The unsigned transaction to sign.
+    /// boxes_to_spend - optional list of input boxes. If not provided, the node will search for the boxes in UTXO
+    /// data_input_boxes - optional list of data boxes. If not provided, the node will search for the data boxes in UTXO
+    pub fn sign_transaction(
+        &self,
+        unsigned_tx: &UnsignedTransaction,
+        boxes_to_spend: Option<Vec<ErgoBox>>,
+        data_input_boxes: Option<Vec<ErgoBox>>,
+    ) -> Result<Transaction> {
+        if let Some(ref boxes_to_spend) = boxes_to_spend {
+            // check input boxes against tx's inputs (for every input should be a box)
+            if let Err(e) = TransactionContext::new(
+                unsigned_tx.clone(),
+                boxes_to_spend.clone(),
+                data_input_boxes.clone().unwrap_or_default(),
+            ) {
+                return Err(NodeError::Other(e.to_string()));
+            };
+        }
 
-        serde_json::from_str(&json_tx.dump())
+        let endpoint = "/wallet/transaction/sign";
+        let prepared_body = json!({ "tx": unsigned_tx, "inputsRaw": boxes_to_spend, "dataInputsRaw": data_input_boxes });
+
+        let json_signed_tx =
+            self.use_json_endpoint_and_check_errors(endpoint, &prepared_body.to_string())?;
+
+        serde_json::from_str(&json_signed_tx.dump())
             .map_err(|_| NodeError::Other("Failed Converting `Transaction` to json".to_string()))
     }
 
     /// Sign an `UnsignedTransaction` and then submit it to the mempool.
     pub fn sign_and_submit_transaction(&self, unsigned_tx: &UnsignedTransaction) -> Result<TxId> {
-        let signed_tx = self.sign_transaction(unsigned_tx)?;
+        let signed_tx = self.sign_transaction(unsigned_tx, None, None)?;
         self.submit_transaction(&signed_tx)
     }
 

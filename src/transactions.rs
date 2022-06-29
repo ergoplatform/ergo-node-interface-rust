@@ -4,6 +4,7 @@ use crate::TxId;
 use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
 use ergo_lib::chain::transaction::Transaction;
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
+use ergo_lib::ergotree_ir::serialization::{SigmaSerializable, SigmaSerializationError};
 use ergo_lib::wallet::signing::TransactionContext;
 use json::JsonValue;
 use serde_json::json;
@@ -77,7 +78,33 @@ impl NodeInterface {
         }
 
         let endpoint = "/wallet/transaction/sign";
-        let prepared_body = json!({ "tx": unsigned_tx, "inputsRaw": boxes_to_spend, "dataInputsRaw": data_input_boxes });
+
+        fn encode_boxes(
+            maybe_boxes: Option<Vec<ErgoBox>>,
+        ) -> std::result::Result<Option<Vec<String>>, NodeError> {
+            match maybe_boxes.map(|boxes| {
+                boxes
+                    .iter()
+                    .map(|b| {
+                        b.sigma_serialize_bytes()
+                            .map(|bytes| base16::encode_lower(&bytes))
+                    })
+                    .collect::<std::result::Result<Vec<String>, SigmaSerializationError>>()
+            }) {
+                Some(Ok(base16_boxes)) => Ok(Some(base16_boxes)),
+                Some(Err(e)) => Err(NodeError::Other(e.to_string())),
+                None => Ok(None),
+            }
+        }
+
+        let input_boxes_base16 = encode_boxes(boxes_to_spend)?;
+        let data_input_boxes_base16 = encode_boxes(data_input_boxes)?;
+
+        let prepared_body = json!({
+            "tx": unsigned_tx,
+            "inputsRaw": input_boxes_base16,
+            "dataInputsRaw": data_input_boxes_base16,
+        });
 
         let json_signed_tx =
             self.use_json_endpoint_and_check_errors(endpoint, &prepared_body.to_string())?;

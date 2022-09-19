@@ -266,7 +266,7 @@ impl NodeInterface {
     /// Given a raw hex-encoded EC point from a register (thus with type encoded characters in front),
     /// convert it to a P2PK address
     pub fn raw_from_register_to_p2pk(&self, typed_raw: &str) -> Result<P2PKAddressString> {
-        self.raw_to_p2pk(&typed_raw[2..].to_string())
+        self.raw_to_p2pk(&typed_raw[2..])
     }
 
     /// Given a `Vec<ErgoBox>` return the given boxes (which must be part of the UTXO-set) as

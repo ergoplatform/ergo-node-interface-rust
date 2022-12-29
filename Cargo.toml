@@ -18,8 +18,8 @@ openssl             = { version = "0.10", features = ["vendored"] }
 reqwest             = { version = "0.11.4", features = ["blocking"] }
 serde               = "1.0"
 serde_json          = "1.0"
-ergo-lib = { version = "0.21" }
-# ergo-lib = { git = "https://github.com/ergoplatform/sigma-rust", rev = "3ada03f6a803a4541ae6d36c28a74efe87c2325b" }
+# ergo-lib = { version = "0.21" }
+ergo-lib = { git = "https://github.com/ergoplatform/sigma-rust", rev = "235a26777cfcebae7ecc621fa6373dc57180430f" }
 thiserror           = "1.0.22"
 blake2b_simd        = "0.5.11"
 base16              = "0.2.1"

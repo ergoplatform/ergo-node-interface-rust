@@ -22,7 +22,10 @@ impl NodeInterface {
 
     /// Sends a GET request to the Ergo node
     pub fn send_get_req(&self, endpoint: &str) -> Result<Response> {
-        let url = self.node_url() + endpoint;
+        let url = self
+            .url
+            .join(endpoint)
+            .map_err(|e| NodeError::InvalidUrl(e.to_string()))?;
         let client = reqwest::blocking::Client::new().get(url);
         self.set_req_headers(client)
             .send()
@@ -31,7 +34,10 @@ impl NodeInterface {
 
     /// Sends a POST request to the Ergo node
     pub fn send_post_req(&self, endpoint: &str, body: String) -> Result<Response> {
-        let url = self.node_url() + endpoint;
+        let url = self
+            .url
+            .join(endpoint)
+            .map_err(|e| NodeError::InvalidUrl(e.to_string()))?;
         let client = reqwest::blocking::Client::new().post(url);
         self.set_req_headers(client)
             .body(body)

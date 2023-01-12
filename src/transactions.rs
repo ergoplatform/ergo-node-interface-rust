@@ -53,7 +53,9 @@ impl NodeInterface {
     pub fn submit_transaction(&self, signed_tx: &Transaction) -> Result<TxId> {
         let signed_tx_json = &serde_json::to_string(&signed_tx)
             .map_err(|_| NodeError::Other("Failed Converting `Transaction` to json".to_string()))?;
-        self.submit_json_transaction(signed_tx_json)
+        let tx_id = self.submit_json_transaction(signed_tx_json)?;
+        assert_eq!(tx_id, signed_tx.id());
+        Ok(tx_id)
     }
 
     /// Sign an `UnsignedTransaction`

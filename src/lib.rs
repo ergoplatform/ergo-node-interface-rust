@@ -18,8 +18,6 @@ pub type P2PKAddressString = String;
 pub type JsonString = String;
 /// A Base58 encoded String of a Ergo P2S address.
 pub type P2SAddressString = String;
-/// Transaction ID
-pub type TxId = String;
 /// The smallest unit of the Erg currency.
 pub type NanoErg = u64;
 /// A block height of the chain.

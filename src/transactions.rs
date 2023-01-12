@@ -1,8 +1,10 @@
+use std::convert::TryFrom;
+
 use crate::node_interface::{NodeError, NodeInterface, Result};
 use crate::JsonString;
-use crate::TxId;
 use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
-use ergo_lib::chain::transaction::Transaction;
+use ergo_lib::chain::transaction::{Transaction, TxId};
+use ergo_lib::ergo_chain_types::Digest32;
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
 use ergo_lib::ergotree_ir::serialization::{SigmaSerializable, SigmaSerializationError};
 use ergo_lib::wallet::signing::TransactionContext;
@@ -15,9 +17,7 @@ impl NodeInterface {
     pub fn submit_json_transaction(&self, signed_tx_json: &JsonString) -> Result<TxId> {
         let endpoint = "/transactions";
         let res_json = self.use_json_endpoint_and_check_errors(endpoint, signed_tx_json)?;
-
-        // If tx is valid and is posted, return just the tx id
-        let tx_id = res_json.dump();
+        let tx_id = parse_tx_id_unsafe(res_json);
         Ok(tx_id)
     }
 
@@ -126,8 +126,7 @@ impl NodeInterface {
     pub fn generate_and_submit_transaction(&self, tx_request_json: &JsonString) -> Result<TxId> {
         let endpoint = "/wallet/transaction/send";
         let res_json = self.use_json_endpoint_and_check_errors(endpoint, tx_request_json)?;
-        // If tx is valid and is posted, return just the tx id
-        let tx_id = res_json.dump();
+        let tx_id = parse_tx_id_unsafe(res_json);
         Ok(tx_id)
     }
 
@@ -140,4 +139,10 @@ impl NodeInterface {
 
         Ok(res_json)
     }
+}
+
+fn parse_tx_id_unsafe(mut res_json: JsonValue) -> TxId {
+    // If tx is valid and is posted, return just the tx id
+    let tx_id_str = res_json.take_string().unwrap();
+    TxId(Digest32::try_from(tx_id_str).unwrap())
 }

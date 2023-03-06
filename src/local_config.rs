@@ -75,7 +75,7 @@ pub fn new_interface_from_yaml(config: Yaml) -> Result<NodeInterface> {
     let api_key = config["node_api_key"].as_str().ok_or_else(|| {
         NodeError::YamlError("`node_api_key` is not specified in the provided Yaml".to_string())
     })?;
-    Ok(NodeInterface::new(api_key, ip, port))
+    NodeInterface::new(api_key, ip, port)
 }
 
 /// Opens a local `node-interface.yaml` file and uses the

@@ -41,18 +41,20 @@ jobs:
         with:
           command: test
           args: --verbose --release
-      - name: rust-tarpaulin code coverage check
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions-rs/tarpaulin@master
-        with:
-          args: '--avoid-cfg-tarpaulin --timeout=360 -v --out Lcov --exclude-files bindings/*'
-      # - name: Upload coverage report to Codecov
-      #   if: matrix.os == 'ubuntu-latest'
-      #   uses: codecov/codecov-action@v1
-      #   with:
-      #     fail_ci_if_error: true
+
+  test_coverage:
+    name: Code coverage in tests
+    runs-on: ubuntu-latest
+    container:
+      image:                    xd009642/tarpaulin:latest
+      options:                  --security-opt seccomp=unconfined
+    steps:
+      - name:                   Checkout repository
+        uses:                   actions/checkout@v2
+      - name:                   Generate code coverage
+        run: |
+          cargo tarpaulin --avoid-cfg-tarpaulin --timeout=360 -v --out Lcov 
       - name: Push code coverage results to coveralls.io
-        if: matrix.os == 'ubuntu-latest' 
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

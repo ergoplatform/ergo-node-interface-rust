@@ -2,6 +2,7 @@
 /// Ergo Node via Rust.
 use crate::{BlockHeight, NanoErg, P2PKAddressString, P2SAddressString};
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
+use reqwest::Url;
 use serde_json::from_str;
 use thiserror::Error;
 
@@ -33,6 +34,8 @@ pub enum NodeError {
     Other(String),
     #[error("Failed parsing wallet status from node: {0}")]
     FailedParsingWalletStatus(String),
+    #[error("Failed to parse URL: {0}")]
+    InvalidUrl(String),
 }
 
 /// The `NodeInterface` struct which holds the relevant Ergo node data
@@ -40,8 +43,7 @@ pub enum NodeError {
 #[derive(Debug, Clone)]
 pub struct NodeInterface {
     pub api_key: String,
-    pub ip: String,
-    pub port: String,
+    pub url: Url,
 }
 
 pub fn is_mainnet_address(address: &str) -> bool {
@@ -54,17 +56,21 @@ pub fn is_testnet_address(address: &str) -> bool {
 
 impl NodeInterface {
     /// Create a new `NodeInterface` using details about the Node
-    pub fn new(api_key: &str, ip: &str, port: &str) -> NodeInterface {
-        NodeInterface {
+    /// Sets url to `http://ip:port` using `ip` and `port`
+    pub fn new(api_key: &str, ip: &str, port: &str) -> Result<Self> {
+        let url = Url::parse(("http://".to_string() + ip + ":" + port + "/").as_str())
+            .map_err(|e| NodeError::InvalidUrl(e.to_string()))?;
+        Ok(NodeInterface {
             api_key: api_key.to_string(),
-            ip: ip.to_string(),
-            port: port.to_string(),
-        }
+            url,
+        })
     }
 
-    /// Returns `http://ip:port` using `ip` and `port` from self
-    pub fn node_url(&self) -> String {
-        "http://".to_string() + &self.ip + ":" + &self.port
+    pub fn from_url(api_key: &str, url: Url) -> Self {
+        NodeInterface {
+            api_key: api_key.to_string(),
+            url,
+        }
     }
 
     /// Get all addresses from the node wallet

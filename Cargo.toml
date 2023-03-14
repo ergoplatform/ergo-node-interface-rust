@@ -1,6 +1,6 @@
 [package]
 name = "ergo-node-interface"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Robert Kornacki <11645932+robkorn@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT"

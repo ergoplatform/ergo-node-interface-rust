@@ -1,9 +1,11 @@
-/// The `NodeInterface` struct is defined which allows for interacting with an
-/// Ergo Node via Rust.
+//! The `NodeInterface` struct is defined which allows for interacting with an Ergo Node via Rust.
+
 use crate::{BlockHeight, NanoErg, P2PKAddressString, P2SAddressString};
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
 use reqwest::Url;
 use serde_json::from_str;
+use serde_with::serde_as;
+use serde_with::NoneAsEmptyString;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, NodeError>;
@@ -105,7 +107,7 @@ impl NodeInterface {
         let mut n = 0;
         for address in &address_list {
             n += 1;
-            println!("{}. {}", n, address);
+            println!("{n}. {address}");
         }
         println!("Which address would you like to select?");
         let mut input = String::new();
@@ -365,6 +367,7 @@ impl NodeInterface {
     }
 }
 
+#[serde_as]
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct WalletStatus {
     #[serde(rename = "isInitialized")]
@@ -372,6 +375,7 @@ pub struct WalletStatus {
     #[serde(rename = "isUnlocked")]
     pub unlocked: bool,
     #[serde(rename = "changeAddress")]
+    #[serde_as(as = "NoneAsEmptyString")]
     pub change_address: Option<P2PKAddressString>,
     #[serde(rename = "walletHeight")]
     pub height: BlockHeight,
@@ -384,7 +388,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_name() {
+    fn test_parsing_wallet_status_unlocked() {
         let node_response_json_str = r#"{
           "isInitialized": true,
           "isUnlocked": true,
@@ -393,6 +397,20 @@ mod tests {
           "error": ""
         }"#;
         let t: WalletStatus = serde_json::from_str(node_response_json_str).unwrap();
+        assert_eq!(t.height, 251965);
+    }
+
+    #[test]
+    fn test_parsing_wallet_status_locked() {
+        let node_response_json_str = r#"{
+          "isInitialized": true,
+          "isUnlocked": false,
+          "changeAddress": "",
+          "walletHeight": 251965,
+          "error": ""
+        }"#;
+        let t: WalletStatus = serde_json::from_str(node_response_json_str).unwrap();
+        assert_eq!(t.change_address, None);
         assert_eq!(t.height, 251965);
     }
 }

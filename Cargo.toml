@@ -24,3 +24,4 @@ thiserror           = "1.0.22"
 blake2b_simd        = "0.5.11"
 base16              = "0.2.1"
 yaml-rust           = "0.4.4"
+serde_with          = { version = "1.14", features = ["json"] }

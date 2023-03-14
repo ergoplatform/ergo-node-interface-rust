@@ -30,10 +30,7 @@ pub fn acquire_node_interface_from_local_config() -> NodeInterface {
     }
     // Error checking reading the local node interface yaml
     if let Err(e) = new_interface_from_local_config() {
-        println!(
-            "Could not parse local `node-interface.yaml` file.\nError: {:?}",
-            e
-        );
+        println!("Could not parse local `node-interface.yaml` file.\nError: {e:?}");
         std::process::exit(0);
     }
     // Create `NodeInterface`

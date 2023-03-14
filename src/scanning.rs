@@ -157,7 +157,7 @@ impl NodeInterface {
                 if let Ok(ergo_box) = res_ergo_box {
                     box_list.push(ergo_box);
                 } else if let Err(e) = res_ergo_box {
-                    let mess = format!("Box Json: {}\nError: {:?}", box_json, e);
+                    let mess = format!("Box Json: {box_json}\nError: {e:?}");
                     return Err(NodeError::FailedParsingBox(mess));
                 }
             }

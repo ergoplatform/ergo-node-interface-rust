@@ -7,10 +7,11 @@ pub mod node_interface;
 mod requests;
 pub mod scanning;
 pub mod transactions;
+mod types;
 
 pub use local_config::*;
 pub use node_interface::NodeInterface;
-pub use scanning::Scan;
+pub use types::*;
 
 /// A Base58 encoded String of a Ergo P2PK address.
 pub type P2PKAddressString = String;
@@ -26,5 +27,3 @@ pub type BlockHeight = u64;
 pub type BlockDuration = u64;
 /// A Base58 encoded String of a Token ID.
 pub type TokenID = String;
-/// Integer which is provided by the Ergo node to reference a given scan.
-pub type ScanID = String;

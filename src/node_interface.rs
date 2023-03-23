@@ -38,6 +38,8 @@ pub enum NodeError {
     FailedParsingWalletStatus(String),
     #[error("Failed to parse URL: {0}")]
     InvalidUrl(String),
+    #[error("Failed to parse scan ID: {0}")]
+    InvalidScanId(String),
 }
 
 /// The `NodeInterface` struct which holds the relevant Ergo node data

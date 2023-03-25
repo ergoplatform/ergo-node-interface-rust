@@ -73,10 +73,11 @@ impl NodeInterface {
             .map_err(|_| NodeError::FailedParsingBox(box_id.clone()))?;
         let scan_id_int: u64 = scan_id.into();
         let endpoint = "/scan/addBox";
-        let body = object! {
+
+        let body = json! ({
             "scanIds": vec![scan_id_int],
             "box": ergo_box,
-        };
+        });
         let res = self.send_post_req(endpoint, body.to_string());
         let res_json = self.parse_response_to_json(res)?;
         if res_json["error"].is_null() {

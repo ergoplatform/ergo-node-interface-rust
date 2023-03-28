@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::node_interface::NodeError;
 
-#[derive(Debug, Copy, Clone, From, Into, Display, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, From, Into, Display, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ScanId(u64);
 
 impl FromStr for ScanId {

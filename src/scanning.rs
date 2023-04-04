@@ -27,11 +27,9 @@ impl NodeInterface {
     }
 
     pub fn deregister_scan(&self, scan_id: ScanId) -> Result<ScanId> {
-        let endpoint = "/scan/deregister/";
-        let body = json! ({
-            "scanId": scan_id,
-        });
-        let res = self.send_post_req(endpoint, to_string_pretty(&body).unwrap());
+        let endpoint = "/scan/deregister";
+        let body = generate_deregister_scan_json(scan_id);
+        let res = self.send_post_req(endpoint, body);
         let res_json = self.parse_response_to_json(res)?;
 
         if res_json["error"].is_null() {
@@ -85,5 +83,27 @@ impl NodeInterface {
         } else {
             Err(NodeError::BadRequest(res_json["error"].to_string()))
         }
+    }
+}
+
+fn generate_deregister_scan_json(scan_id: ScanId) -> String {
+    let body = json!({
+        "scanId": scan_id,
+    });
+    to_string_pretty(&body).unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_deregister_scan_json() {
+        let scan_id = ScanId::from(100);
+        expect_test::expect![[r#"
+            {
+              "scanId": 100
+            }"#]]
+        .assert_eq(&generate_deregister_scan_json(scan_id));
     }
 }

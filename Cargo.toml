@@ -24,3 +24,6 @@ base16 = "0.2.1"
 yaml-rust = "0.4.4"
 thiserror = "1.0.22"
 derive_more = "0.99"
+
+[dev-dependencies]
+expect-test = "1.0.1"

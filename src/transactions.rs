@@ -141,6 +141,17 @@ impl NodeInterface {
 
         Ok(res_json)
     }
+
+    /// Gets the recommended fee for a transaction.
+    /// bytes - size of the transaction in bytes
+    /// wait_time - minutes to wait for the transaction to be included in the blockchain
+    pub fn get_recommended_fee(&self, bytes: u64, wait_time: u64) -> Result<u64> {
+        let endpoint = format!("/transactions/getFee?bytes={}&waitTime={}", bytes, wait_time);
+        let res = self.send_get_req(&endpoint);
+        let res_json = self.parse_response_to_json(res);
+        let fee = res_json?.as_u64().unwrap();
+        Ok(fee)
+    }
 }
 
 fn parse_tx_id_unsafe(mut res_json: JsonValue) -> TxId {

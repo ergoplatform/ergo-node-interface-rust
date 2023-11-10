@@ -12,6 +12,9 @@ pub use local_config::*;
 pub use node_interface::NodeInterface;
 pub use scanning::Scan;
 
+// So dependant crates dont need to depend on `reqwest` to create a node from `Url`.
+pub use reqwest::Url;
+
 /// A Base58 encoded String of a Ergo P2PK address.
 pub type P2PKAddressString = String;
 /// A JSON String

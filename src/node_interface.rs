@@ -75,6 +75,14 @@ impl NodeInterface {
         }
     }
 
+    pub fn from_url_str(api_key: &str, url: &str) -> Result<Self> {
+        let url = Url::parse(url).map_err(|e| NodeError::InvalidUrl(e.to_string()))?;
+        Ok(NodeInterface {
+            api_key: api_key.to_string(),
+            url,
+        })
+    }
+
     /// Get all addresses from the node wallet
     pub fn wallet_addresses(&self) -> Result<Vec<P2PKAddressString>> {
         let endpoint = "/wallet/addresses";

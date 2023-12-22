@@ -373,6 +373,23 @@ impl NodeInterface {
             Err(NodeError::FailedParsingWalletStatus(res_json.pretty(2)))
         }
     }
+
+    /// Unlock wallet
+    pub fn wallet_unlock(&self, password: &str) -> Result<bool> {
+        let endpoint = "/wallet/unlock";
+        let body = object! {
+            pass: password,
+        };
+
+        let res = self.send_post_req(endpoint, body.to_string())?;
+
+        if res.status().is_success() {
+            Ok(true)
+        } else {
+            let json = self.parse_response_to_json(Ok(res))?;
+            Err(NodeError::BadRequest(json["error"].to_string()))
+        }
+    }
 }
 
 #[serde_as]

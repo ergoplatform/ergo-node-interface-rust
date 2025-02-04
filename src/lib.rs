@@ -7,8 +7,8 @@ pub mod node_interface;
 mod requests;
 pub mod scanning;
 pub mod transactions;
-pub mod wallet;
 mod types;
+pub mod wallet;
 
 pub use local_config::*;
 pub use node_interface::NodeInterface;

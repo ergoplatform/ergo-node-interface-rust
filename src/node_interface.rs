@@ -1,13 +1,13 @@
 //! The `NodeInterface` struct is defined which allows for interacting with an Ergo Node via Rust.
 
-use std::convert::TryInto;
+use crate::{BlockHeight, NanoErg, P2PKAddressString, P2SAddressString};
 use ergo_lib::chain::ergo_state_context::{ErgoStateContext, Headers};
 use ergo_lib::ergo_chain_types::{Header, PreHeader};
-use crate::{BlockHeight, NanoErg, P2PKAddressString, P2SAddressString};
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
 use ergo_lib::ergotree_ir::chain::token::TokenId;
 use reqwest::Url;
 use serde_json::from_str;
+use std::convert::TryInto;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, NodeError>;
@@ -88,13 +88,17 @@ impl NodeInterface {
     }
 
     /// Acquires unspent boxes from the blockchain by specific address
-    pub fn unspent_boxes_by_address(&self, address: &P2PKAddressString, offset: u64, limit: u64) -> Result<Vec<ErgoBox>> {
+    pub fn unspent_boxes_by_address(
+        &self,
+        address: &P2PKAddressString,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<ErgoBox>> {
         let endpoint = format!(
             "/blockchain/box/unspent/byAddress?offset={}&limit={}",
-            offset,
-            limit
+            offset, limit
         );
-        let res = self.send_post_req(&endpoint, address.clone());
+        let res = self.send_post_req(endpoint.as_str(), address.clone());
         let res_json = self.parse_response_to_json(res)?;
 
         let mut box_list = vec![];
@@ -114,15 +118,18 @@ impl NodeInterface {
     }
 
     /// Acquires unspent boxes from the blockchain by specific token_id
-    pub fn unspent_boxes_by_token_id(&self, token_id: &TokenId, offset: u64, limit: u64) -> Result<Vec<ErgoBox>> {
-        let id: String = token_id.clone().into();
+    pub fn unspent_boxes_by_token_id(
+        &self,
+        token_id: &TokenId,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<ErgoBox>> {
+        let id: String = (*token_id).into();
         let endpoint = format!(
             "/blockchain/box/unspent/byTokenId/{}?offset={}&limit={}",
-            id,
-            offset,
-            limit
+            id, offset, limit
         );
-        let res = self.send_get_req(&endpoint);
+        let res = self.send_get_req(endpoint.as_str());
         let res_json = self.parse_response_to_json(res)?;
 
         let mut box_list = vec![];
@@ -144,7 +151,7 @@ impl NodeInterface {
     /// Get the current nanoErgs balance held in the `address`
     pub fn nano_ergs_balance(&self, address: &P2PKAddressString) -> Result<NanoErg> {
         let endpoint = "/blockchain/balance";
-        let res = self.send_post_req(&endpoint, address.clone());
+        let res = self.send_post_req(endpoint, address.clone());
         let res_json = self.parse_response_to_json(res)?;
 
         let balance = res_json["confirmed"]["nanoErgs"].clone();
@@ -273,7 +280,7 @@ impl NodeInterface {
         vec_headers.reverse();
         let ten_headers: [Header; 10] = vec_headers.try_into().unwrap();
         let headers = Headers::from(ten_headers);
-        let pre_header = PreHeader::from(headers.get(0).unwrap().clone());
+        let pre_header = PreHeader::from(headers.first().unwrap().clone());
         let state_context = ErgoStateContext::new(pre_header, headers);
 
         Ok(state_context)
@@ -281,11 +288,8 @@ impl NodeInterface {
 
     /// Get the last `number` of block headers from the blockchain
     pub fn get_last_block_headers(&self, number: u32) -> Result<Vec<Header>> {
-        let endpoint = format!(
-            "/blocks/lastHeaders/{}",
-            number
-        );
-        let res = self.send_get_req(&endpoint);
+        let endpoint = format!("/blocks/lastHeaders/{}", number);
+        let res = self.send_get_req(endpoint.as_str());
         let res_json = self.parse_response_to_json(res)?;
 
         let mut headers: Vec<Header> = vec![];
@@ -315,8 +319,12 @@ impl NodeInterface {
             });
         }
 
-        let full_height = res_json["fullHeight"].as_u64().ok_or(NodeError::FailedParsingNodeResponse(res_json.to_string()))?;
-        let indexed_height = res_json["indexedHeight"].as_u64().ok_or(NodeError::FailedParsingNodeResponse(res_json.to_string()))?;
+        let full_height = res_json["fullHeight"]
+            .as_u64()
+            .ok_or(NodeError::FailedParsingNodeResponse(res_json.to_string()))?;
+        let indexed_height = res_json["indexedHeight"]
+            .as_u64()
+            .ok_or(NodeError::FailedParsingNodeResponse(res_json.to_string()))?;
 
         let is_sync = full_height.abs_diff(indexed_height) < 10;
         Ok(IndexerStatus {

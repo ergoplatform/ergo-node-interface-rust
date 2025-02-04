@@ -1,13 +1,13 @@
-use crate::node_interface::{is_mainnet_address, is_testnet_address, NodeError, NodeInterface, Result};
+use crate::node_interface::{
+    is_mainnet_address, is_testnet_address, NodeError, NodeInterface, Result,
+};
 use crate::{BlockHeight, NanoErg, P2PKAddressString};
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
 use serde_json::from_str;
 use serde_with::serde_as;
 use serde_with::NoneAsEmptyString;
 
-
 impl NodeInterface {
-
     /// Get all addresses from the node wallet
     pub fn wallet_addresses(&self) -> Result<Vec<P2PKAddressString>> {
         let endpoint = "/wallet/addresses";

@@ -1,11 +1,13 @@
 //! The `NodeInterface` struct is defined which allows for interacting with an Ergo Node via Rust.
 
 use crate::{BlockHeight, NanoErg, P2PKAddressString, P2SAddressString};
+use ergo_lib::chain::ergo_state_context::{ErgoStateContext, Headers};
+use ergo_lib::ergo_chain_types::{Header, PreHeader};
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
+use ergo_lib::ergotree_ir::chain::token::TokenId;
 use reqwest::Url;
 use serde_json::from_str;
-use serde_with::serde_as;
-use serde_with::NoneAsEmptyString;
+use std::convert::TryInto;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, NodeError>;
@@ -85,156 +87,82 @@ impl NodeInterface {
         })
     }
 
-    /// Get all addresses from the node wallet
-    pub fn wallet_addresses(&self) -> Result<Vec<P2PKAddressString>> {
-        let endpoint = "/wallet/addresses";
-        let res = self.send_get_req(endpoint)?;
-
-        let mut addresses: Vec<String> = vec![];
-        for segment in res
-            .text()
-            .expect("Failed to get addresses from wallet.")
-            .split('\"')
-        {
-            let seg = segment.trim();
-            if is_mainnet_address(seg) || is_testnet_address(seg) {
-                addresses.push(seg.to_string());
-            }
-        }
-        if addresses.is_empty() {
-            return Err(NodeError::NoAddressesInWallet);
-        }
-        Ok(addresses)
-    }
-
-    /// A CLI interactive interface for prompting a user to select an address
-    pub fn select_wallet_address(&self) -> Result<P2PKAddressString> {
-        let address_list = self.wallet_addresses()?;
-        if address_list.len() == 1 {
-            return Ok(address_list[0].clone());
-        }
-
-        let mut n = 0;
-        for address in &address_list {
-            n += 1;
-            println!("{n}. {address}");
-        }
-        println!("Which address would you like to select?");
-        let mut input = String::new();
-        if std::io::stdin().read_line(&mut input).is_ok() {
-            if let Ok(input_n) = input.trim().parse::<usize>() {
-                if input_n > address_list.len() || input_n < 1 {
-                    println!("Please select an address within the range.");
-                    return self.select_wallet_address();
-                }
-                return Ok(address_list[input_n - 1].clone());
-            }
-        }
-        self.select_wallet_address()
-    }
-
-    /// Acquires unspent boxes from the node wallet
-    pub fn unspent_boxes(&self) -> Result<Vec<ErgoBox>> {
-        let endpoint = "/wallet/boxes/unspent?minConfirmations=0&minInclusionHeight=0";
-        let res = self.send_get_req(endpoint);
+    /// Acquires unspent boxes from the blockchain by specific address
+    pub fn unspent_boxes_by_address(
+        &self,
+        address: &P2PKAddressString,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<ErgoBox>> {
+        let endpoint = format!(
+            "/blockchain/box/unspent/byAddress?offset={}&limit={}",
+            offset, limit
+        );
+        let res = self.send_post_req(endpoint.as_str(), address.clone());
         let res_json = self.parse_response_to_json(res)?;
 
         let mut box_list = vec![];
 
         for i in 0.. {
-            let box_json = &res_json[i]["box"];
+            let box_json = &res_json[i];
             if box_json.is_null() {
                 break;
             } else if let Ok(ergo_box) = from_str(&box_json.to_string()) {
-                box_list.push(ergo_box);
+                // This condition is added due to a bug in the node indexer that returns some spent boxes as unspent.
+                if box_json["spentTransactionId"].is_null() {
+                    box_list.push(ergo_box);
+                }
             }
         }
         Ok(box_list)
     }
 
-    /// Returns unspent boxes from the node wallet ordered from highest to
-    /// lowest nanoErgs value.
-    pub fn unspent_boxes_sorted(&self) -> Result<Vec<ErgoBox>> {
-        let mut boxes = self.unspent_boxes()?;
-        boxes.sort_by(|a, b| b.value.as_u64().partial_cmp(a.value.as_u64()).unwrap());
+    /// Acquires unspent boxes from the blockchain by specific token_id
+    pub fn unspent_boxes_by_token_id(
+        &self,
+        token_id: &TokenId,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<ErgoBox>> {
+        let id: String = (*token_id).into();
+        let endpoint = format!(
+            "/blockchain/box/unspent/byTokenId/{}?offset={}&limit={}",
+            id, offset, limit
+        );
+        let res = self.send_get_req(endpoint.as_str());
+        let res_json = self.parse_response_to_json(res)?;
 
-        Ok(boxes)
-    }
+        let mut box_list = vec![];
 
-    /// Returns a sorted list of unspent boxes which cover at least the
-    /// provided value `total` of nanoErgs.
-    /// Note: This box selection strategy simply uses the largest
-    /// value holding boxes from the user's wallet first.
-    pub fn unspent_boxes_with_min_total(&self, total: NanoErg) -> Result<Vec<ErgoBox>> {
-        self.consume_boxes_until_total(total, &self.unspent_boxes_sorted()?)
-    }
-
-    /// Returns a list of unspent boxes which cover at least the
-    /// provided value `total` of nanoErgs.
-    /// Note: This box selection strategy simply uses the oldest unspent
-    /// boxes from the user's full node wallet first.
-    pub fn unspent_boxes_with_min_total_by_age(&self, total: NanoErg) -> Result<Vec<ErgoBox>> {
-        self.consume_boxes_until_total(total, &self.unspent_boxes()?)
-    }
-
-    /// Given a `Vec<ErgoBox>`, consume each ErgoBox into a new list until
-    /// the `total` is reached. If there are an insufficient number of
-    /// nanoErgs in the provided `boxes` then it returns an error.
-    fn consume_boxes_until_total(&self, total: NanoErg, boxes: &[ErgoBox]) -> Result<Vec<ErgoBox>> {
-        let mut count = 0;
-        let mut filtered_boxes = vec![];
-        for b in boxes {
-            if count >= total {
+        for i in 0.. {
+            let box_json = &res_json[i];
+            if box_json.is_null() {
                 break;
-            } else {
-                count += b.value.as_u64();
-                filtered_boxes.push(b.clone());
+            } else if let Ok(ergo_box) = from_str(&box_json.to_string()) {
+                // This condition is added due to a bug in the node indexer that returns some spent boxes as unspent.
+                if box_json["spentTransactionId"].is_null() {
+                    box_list.push(ergo_box);
+                }
             }
         }
-        if count < total {
-            return Err(NodeError::InsufficientErgsBalance());
-        }
-        Ok(filtered_boxes)
+        Ok(box_list)
     }
 
-    /// Acquires the unspent box with the highest value of Ergs inside
-    /// from the wallet
-    pub fn highest_value_unspent_box(&self) -> Result<ErgoBox> {
-        let boxes = self.unspent_boxes()?;
+    /// Get the current nanoErgs balance held in the `address`
+    pub fn nano_ergs_balance(&self, address: &P2PKAddressString) -> Result<NanoErg> {
+        let endpoint = "/blockchain/balance";
+        let res = self.send_post_req(endpoint, address.clone());
+        let res_json = self.parse_response_to_json(res)?;
 
-        // Find the highest value amount held in a single box in the wallet
-        let highest_value = boxes.iter().fold(0, |acc, b| {
-            if *b.value.as_u64() > acc {
-                *b.value.as_u64()
-            } else {
-                acc
-            }
-        });
+        let balance = res_json["confirmed"]["nanoErgs"].clone();
 
-        for b in boxes {
-            if *b.value.as_u64() == highest_value {
-                return Ok(b);
-            }
+        if balance.is_null() {
+            Err(NodeError::NodeSyncing)
+        } else {
+            balance
+                .as_u64()
+                .ok_or_else(|| NodeError::FailedParsingNodeResponse(res_json.to_string()))
         }
-        Err(NodeError::NoBoxesFound)
-    }
-
-    /// Acquires the unspent box with the highest value of Ergs inside
-    /// from the wallet and serializes it
-    pub fn serialized_highest_value_unspent_box(&self) -> Result<String> {
-        let ergs_box_id: String = self.highest_value_unspent_box()?.box_id().into();
-        self.serialized_box_from_id(&ergs_box_id)
-    }
-
-    /// Acquires unspent boxes which cover `total` amount of nanoErgs
-    /// from the wallet and serializes the boxes
-    pub fn serialized_unspent_boxes_with_min_total(&self, total: NanoErg) -> Result<Vec<String>> {
-        let boxes = self.unspent_boxes_with_min_total(total)?;
-        let mut serialized_boxes = vec![];
-        for b in boxes {
-            serialized_boxes.push(self.serialized_box_from_id(&b.box_id().into())?);
-        }
-        Ok(serialized_boxes)
     }
 
     /// Given a P2S Ergo address, extract the hex-encoded serialized ErgoTree (script)
@@ -328,23 +256,6 @@ impl NodeInterface {
         }
     }
 
-    /// Get the current nanoErgs balance held in the Ergo Node wallet
-    pub fn wallet_nano_ergs_balance(&self) -> Result<NanoErg> {
-        let endpoint = "/wallet/balances";
-        let res = self.send_get_req(endpoint);
-        let res_json = self.parse_response_to_json(res)?;
-
-        let balance = res_json["balance"].clone();
-
-        if balance.is_null() {
-            Err(NodeError::NodeSyncing)
-        } else {
-            balance
-                .as_u64()
-                .ok_or_else(|| NodeError::FailedParsingNodeResponse(res_json.to_string()))
-        }
-    }
-
     /// Get the current block height of the blockchain
     pub fn current_block_height(&self) -> Result<BlockHeight> {
         let endpoint = "/info";
@@ -363,81 +274,67 @@ impl NodeInterface {
         }
     }
 
-    /// Get wallet status /wallet/status
-    pub fn wallet_status(&self) -> Result<WalletStatus> {
-        let endpoint = "/wallet/status";
+    /// Get the current state context of the blockchain
+    pub fn get_state_context(&self) -> Result<ErgoStateContext> {
+        let mut vec_headers = self.get_last_block_headers(10)?;
+        vec_headers.reverse();
+        let ten_headers: [Header; 10] = vec_headers.try_into().unwrap();
+        let headers = Headers::from(ten_headers);
+        let pre_header = PreHeader::from(headers.first().unwrap().clone());
+        let state_context = ErgoStateContext::new(pre_header, headers);
+
+        Ok(state_context)
+    }
+
+    /// Get the last `number` of block headers from the blockchain
+    pub fn get_last_block_headers(&self, number: u32) -> Result<Vec<Header>> {
+        let endpoint = format!("/blocks/lastHeaders/{}", number);
+        let res = self.send_get_req(endpoint.as_str());
+        let res_json = self.parse_response_to_json(res)?;
+
+        let mut headers: Vec<Header> = vec![];
+
+        for i in 0.. {
+            let header_json = &res_json[i];
+            if header_json.is_null() {
+                break;
+            } else if let Ok(header) = from_str(&header_json.to_string()) {
+                headers.push(header);
+            }
+        }
+        Ok(headers)
+    }
+
+    /// Checks if the blockchain indexer is active by querying the node.
+    pub fn indexer_status(&self) -> Result<IndexerStatus> {
+        let endpoint = "/blockchain/indexedHeight";
         let res = self.send_get_req(endpoint);
         let res_json = self.parse_response_to_json(res)?;
 
-        if let Ok(wallet_status) = from_str(&res_json.to_string()) {
-            Ok(wallet_status)
-        } else {
-            Err(NodeError::FailedParsingWalletStatus(res_json.pretty(2)))
+        let error = res_json["error"].clone();
+        if !error.is_null() {
+            return Ok(IndexerStatus {
+                is_active: false,
+                is_sync: false,
+            });
         }
-    }
 
-    /// Unlock wallet
-    pub fn wallet_unlock(&self, password: &str) -> Result<bool> {
-        let endpoint = "/wallet/unlock";
-        let body = object! {
-            pass: password,
-        };
+        let full_height = res_json["fullHeight"]
+            .as_u64()
+            .ok_or(NodeError::FailedParsingNodeResponse(res_json.to_string()))?;
+        let indexed_height = res_json["indexedHeight"]
+            .as_u64()
+            .ok_or(NodeError::FailedParsingNodeResponse(res_json.to_string()))?;
 
-        let res = self.send_post_req(endpoint, body.to_string())?;
-
-        if res.status().is_success() {
-            Ok(true)
-        } else {
-            let json = self.parse_response_to_json(Ok(res))?;
-            Err(NodeError::BadRequest(json["error"].to_string()))
-        }
+        let is_sync = full_height.abs_diff(indexed_height) < 10;
+        Ok(IndexerStatus {
+            is_active: true,
+            is_sync,
+        })
     }
 }
 
-#[serde_as]
-#[derive(serde::Deserialize, serde::Serialize)]
-pub struct WalletStatus {
-    #[serde(rename = "isInitialized")]
-    pub initialized: bool,
-    #[serde(rename = "isUnlocked")]
-    pub unlocked: bool,
-    #[serde(rename = "changeAddress")]
-    #[serde_as(as = "NoneAsEmptyString")]
-    pub change_address: Option<P2PKAddressString>,
-    #[serde(rename = "walletHeight")]
-    pub height: BlockHeight,
-    #[serde(rename = "error")]
-    pub error: Option<String>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parsing_wallet_status_unlocked() {
-        let node_response_json_str = r#"{
-          "isInitialized": true,
-          "isUnlocked": true,
-          "changeAddress": "3Wwc4HWrTcYkRycPNhEUSwNNBdqSBuiHy2zFvjMHukccxE77BaX3",
-          "walletHeight": 251965,
-          "error": ""
-        }"#;
-        let t: WalletStatus = serde_json::from_str(node_response_json_str).unwrap();
-        assert_eq!(t.height, 251965);
-    }
-
-    #[test]
-    fn test_parsing_wallet_status_locked() {
-        let node_response_json_str = r#"{
-          "isInitialized": true,
-          "isUnlocked": false,
-          "changeAddress": "",
-          "walletHeight": 251965,
-          "error": ""
-        }"#;
-        let t: WalletStatus = serde_json::from_str(node_response_json_str).unwrap();
-        assert_eq!(t.change_address, None);
-        assert_eq!(t.height, 251965);
-    }
+pub struct IndexerStatus {
+    pub is_active: bool,
+    pub is_sync: bool,
 }

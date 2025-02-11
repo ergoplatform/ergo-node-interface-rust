@@ -8,6 +8,7 @@ mod requests;
 pub mod scanning;
 pub mod transactions;
 mod types;
+pub mod wallet;
 
 pub use local_config::*;
 pub use node_interface::NodeInterface;

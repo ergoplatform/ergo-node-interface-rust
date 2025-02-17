@@ -30,10 +30,9 @@ println!("Current height: {}", node.current_block_height());
 Furthermore a number of helper methods are implemented as well, such as:
 
 ```rust
-/// A CLI interactive interface for prompting a user to select an address
-pub fn select_wallet_address(&self) -> Result<P2PKAddressString>
 
-
+/// Get the current state context of the blockchain
+pub fn get_state_context(&self) -> Result<ErgoStateContext>
 /// Returns a sorted list of unspent boxes which cover at least the
 /// provided value `total` of nanoErgs.
 /// Note: This box selection strategy simply uses the largest

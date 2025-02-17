@@ -30,32 +30,6 @@ impl NodeInterface {
         Ok(addresses)
     }
 
-    /// A CLI interactive interface for prompting a user to select an address
-    pub fn select_wallet_address(&self) -> Result<P2PKAddressString> {
-        let address_list = self.wallet_addresses()?;
-        if address_list.len() == 1 {
-            return Ok(address_list[0].clone());
-        }
-
-        let mut n = 0;
-        for address in &address_list {
-            n += 1;
-            println!("{n}. {address}");
-        }
-        println!("Which address would you like to select?");
-        let mut input = String::new();
-        if std::io::stdin().read_line(&mut input).is_ok() {
-            if let Ok(input_n) = input.trim().parse::<usize>() {
-                if input_n > address_list.len() || input_n < 1 {
-                    println!("Please select an address within the range.");
-                    return self.select_wallet_address();
-                }
-                return Ok(address_list[input_n - 1].clone());
-            }
-        }
-        self.select_wallet_address()
-    }
-
     /// Acquires unspent boxes from the node wallet
     pub fn unspent_boxes(&self) -> Result<Vec<ErgoBox>> {
         let endpoint = "/wallet/boxes/unspent?minConfirmations=0&minInclusionHeight=0";
